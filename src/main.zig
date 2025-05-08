@@ -1,8 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-// const Map = @import("hash.zig").Map;
-const Map = @import("data.zig").Map;
+const Map = @import("hash.zig").Map;
+// const Map = @import("tape.zig").Map;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 10 }){};
