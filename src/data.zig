@@ -1,9 +1,11 @@
 const std = @import("std");
 
 pub const Map = struct {
-    var ranges: [256]Range = ([_]Range{.{}}) ** 256;
+    pub const name = "DataMap";
 
     const Self = @This();
+
+    var ranges: [256]Range = ([_]Range{.{}}) ** 256;
 
     const Word = struct {
         word: []const u8,

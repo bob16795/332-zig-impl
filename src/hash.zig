@@ -1,6 +1,8 @@
 const std = @import("std");
 
 pub const Map = struct {
+    pub const name = "HashMap";
+
     const Self = @This();
 
     const BaseMap = std.StringHashMap([]const u8);

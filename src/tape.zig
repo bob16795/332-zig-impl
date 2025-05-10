@@ -1,6 +1,8 @@
 const std = @import("std");
 
 pub const Map = struct {
+    pub const name = "TapeMap";
+
     const Self = @This();
 
     const Node = struct {
@@ -142,10 +144,6 @@ pub const Map = struct {
 
         const tape = try tape_from_node(root);
 
-        for (tape) |t| {
-            std.log.info("TAPE: {}", .{t});
-        }
-
         return .{
             .allocator = allocator,
 
@@ -175,7 +173,6 @@ pub const Map = struct {
         var idx: usize = 0;
 
         while (idx < self.tape.len) {
-            std.log.info("TAPE_INST: {}", .{self.tape[idx]});
             switch (self.tape[idx]) {
                 .choice => |c| {
                     idx = idx + c.offset + (value % c.count);
@@ -185,8 +182,6 @@ pub const Map = struct {
                 .data => |d| return d,
             }
         }
-
-        std.log.info("{s}", .{input});
 
         return error.WordNotFound;
     }
