@@ -10,48 +10,44 @@ pub const Map = struct {
     const Word = struct {
         word: []const u8,
         outputWord: []const u8,
-        value: f64 = 0.5,
+        value: f128 = 0.5,
 
-        low: f64 = 0,
-        high: f64 = 1,
+        low: f128 = 0,
+        high: f128 = 1,
 
         fn lessThan(_: void, a: Word, b: Word) bool {
             return (a.value < b.value);
         }
 
-        fn compare(a: []const u8, b: Word) std.math.Order {
-            var wordRange = Range{};
-
-            for (a) |ch| {
-                const currentRange = wordRange.high - wordRange.low;
-                const chRange = ranges[@intCast(ch)];
-
-                //Shrink the range
-                wordRange.high = wordRange.low + (currentRange * chRange.high);
-                wordRange.low = wordRange.low + (currentRange * chRange.low);
-            }
-
-            const value = (wordRange.high + wordRange.low) / 2;
-
-            return if (value < b.low)
-                .lt
-            else if (value > b.high)
-                .gt
-            else
-                .eq;
+        fn compare(a: f128, b: Word) std.math.Order {
+            if (a < b.value) return .lt;
+            if (a > b.value) return .gt;
+            return .eq;
         }
     };
 
     const Range = struct {
-        prob: f64 = 0,
-        low: f64 = 0,
-        high: f64 = 1,
+        prob: f128 = 0,
+        low: f128 = 0,
+        high: f128 = 1,
     };
 
     words: std.ArrayList(Word),
 
     uniqueChars: usize = 0,
     charCount: usize = 0,
+
+    //realized its a huge waste of time to find the number every single time
+    fn findValueFor(input: []const u8) f128 {
+        var wordRange = Range{};
+        for (input) |ch| {
+            const currentRange = wordRange.high - wordRange.low;
+            const chRange = ranges[@intCast(ch)];
+            wordRange.high = wordRange.low + (currentRange * chRange.high);
+            wordRange.low = wordRange.low + (currentRange * chRange.low);
+        }
+        return (wordRange.high + wordRange.low) / 2;
+    }
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -87,7 +83,7 @@ pub const Map = struct {
             std.log.info("{c} {}", .{ @as(u8, @intCast(i)), range.prob });
         }
 
-        var lowInterval: f64 = 0;
+        var lowInterval: f128 = 0;
 
         for (&ranges) |*range| {
             //ignore empty values they don't have a character
@@ -133,10 +129,19 @@ pub const Map = struct {
     }
 
     pub fn get(self: *const Self, input: []const u8) ![]const u8 {
+        //sanity check linear search
+        // for (self.words.items) |word| {
+        //     if (std.mem.eql(u8, input, word.word)) {
+        //         return word.outputWord;
+        //     }
+        // }
+
+        //Get the interval/value for the word
+        const target = findValueFor(input);
         const index = std.sort.binarySearch(
             Word,
             self.words.items,
-            input,
+            target,
             Word.compare,
         ) orelse return error.WordNotFound;
 
