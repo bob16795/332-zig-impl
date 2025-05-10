@@ -1,3 +1,6 @@
 .zig-cache
 tmp
 zig-out
+DataMapspeare.txt
+HashMapspeare.txt
+TapeMapspeare.txt

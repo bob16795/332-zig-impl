@@ -17,10 +17,13 @@ pub const Map = struct {
                 return;
             }
 
-            const ch: usize = @intCast(if (word[0] >= 'a' or word[0] <= 'z')
-                word[0] - 'a'
-            else if (word[0] >= 'A' or word[0] <= 'Z')
-                word[0] - 'A'
+            const chidx = word.len - 1;
+            const ich = word[chidx];
+
+            const ch: usize = @intCast(if (ich >= 'a' or ich <= 'z')
+                ich - 'a'
+            else if (ich >= 'A' or ich <= 'Z')
+                ich - 'A'
             else
                 return error.InvalidCharInWord);
 
@@ -31,7 +34,7 @@ pub const Map = struct {
                 self.next[ch] = new_node;
             }
 
-            return self.next[ch].?.push(word[1..], output);
+            return self.next[ch].?.push(word[0..chidx], output);
         }
 
         pub fn deinit(self: *Node) void {
@@ -46,9 +49,22 @@ pub const Map = struct {
     const InstKind = enum { data, goto, choice };
 
     const TapeInst = union(InstKind) {
-        data: []const u8,
+        data: ?[]const u8,
         goto: usize,
         choice: struct { offset: usize, count: usize },
+
+        pub fn format(
+            self: TapeInst,
+            comptime _: []const u8,
+            _: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
+            try switch (self) {
+                .data => std.fmt.format(writer, "data'{?s}'", .{self.data}),
+                .goto => std.fmt.format(writer, "goto'+{}'", .{self.goto}),
+                .choice => std.fmt.format(writer, "goto'+{}%{}'", .{ self.choice.offset, self.choice.count }),
+            };
+        }
     };
 
     tape: []TapeInst,
@@ -64,7 +80,7 @@ pub const Map = struct {
 
         if (!has_children) {
             const tape = try node.allocator.alloc(TapeInst, 1);
-            tape[0] = TapeInst{ .data = node.output orelse "" };
+            tape[0] = TapeInst{ .data = node.output orelse null };
 
             return tape;
         }
@@ -81,7 +97,7 @@ pub const Map = struct {
         defer tape_data.deinit();
 
         const tmp_tape = try node.allocator.dupe(TapeInst, &.{
-            .{ .data = node.output orelse &.{} },
+            .{ .data = node.output },
         });
         try all_tapes.append(.{
             .tape = tmp_tape,
@@ -92,12 +108,13 @@ pub const Map = struct {
         for (node.next) |next_node| {
             if (next_node) |n| {
                 const tape = try tape_from_node(n);
-                offset += tape.len;
 
                 try all_tapes.append(.{
                     .tape = tape,
                     .offset = offset,
                 });
+
+                offset += tape.len;
             } else {
                 try all_tapes.append(.{
                     .tape = &.{},
@@ -114,8 +131,8 @@ pub const Map = struct {
         } };
         var node_idx: usize = all_tapes.items.len + 1;
         for (all_tapes.items, 1..) |tape, goto_idx| {
-            const start = all_tapes.items.len + 1 - goto_idx;
-            output[goto_idx] = TapeInst{ .goto = offset + start };
+            const start = all_tapes.items.len - goto_idx + 1;
+            output[goto_idx] = TapeInst{ .goto = tape.offset + start };
             @memcpy(output[node_idx .. node_idx + tape.tape.len], tape.tape);
 
             node_idx += tape.tape.len;
@@ -155,34 +172,61 @@ pub const Map = struct {
         self.allocator.free(self.tape);
     }
 
-    pub fn get(self: *const Self, input: []const u8) ![]const u8 {
-        var value: usize = 0;
+    fn divModHelper(allocator: std.mem.Allocator, input: *[]u8, number: usize) !usize {
+        if (number == 0) return 0;
+        if (input.len == 0) return 0;
+        if (number == 27) {
+            const result = input.*[input.*.len - 1] - ('a' - 1);
+            input.* = try allocator.realloc(input.*, input.*.len - 1);
 
-        for (input) |ich| {
-            const ch: usize = @intCast(if (ich >= 'a' or ich <= 'z')
-                ich - 'a' + 1
-            else if (ich >= 'A' or ich <= 'Z')
-                ich - 'A' + 1
-            else
-                return error.InvalidCharInWord);
-
-            value *= 256;
-            value += ch;
+            return result;
         }
+
+        const old_input = input.*;
+        defer allocator.free(old_input);
+
+        input.* = try allocator.dupe(u8, input.*);
+
+        var carry: usize = 0;
+        var i: usize = 0;
+        for (old_input) |ch| {
+            const d: usize = @as(usize, @intCast(if (ch >= 'a' or ch <= 'z')
+                ch - ('a' - 1)
+            else if (ch >= 'A' or ch <= 'Z')
+                ch - ('A' - 1)
+            else
+                0)) + 27 * carry;
+            carry = d % number;
+            const new_d = (d / number);
+            if (new_d != 0 or i != 0) {
+                input.*[i] = @intCast(new_d + 'a' - 1);
+                i += 1;
+            }
+        }
+
+        input.* = try allocator.realloc(input.*, i);
+
+        return carry;
+    }
+
+    pub fn get(self: *const Self, input: []const u8) !?[]const u8 {
+        var value = try self.allocator.dupe(u8, input);
+        defer self.allocator.free(value);
+
+        // std.mem.reverse(u8, value);
 
         var idx: usize = 0;
 
         while (idx < self.tape.len) {
             switch (self.tape[idx]) {
                 .choice => |c| {
-                    idx = idx + c.offset + (value % c.count);
-                    value /= c.count;
+                    idx = idx + c.offset + try divModHelper(self.allocator, &value, c.count);
                 },
                 .goto => |g| idx += g,
                 .data => |d| return d,
             }
         }
 
-        return error.WordNotFound;
+        return null;
     }
 };

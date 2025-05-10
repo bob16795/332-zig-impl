@@ -31,7 +31,7 @@ pub const Map = struct {
         self.data.deinit();
     }
 
-    pub fn get(self: *const Self, input: []const u8) ![]const u8 {
-        return self.data.get(input) orelse error.BadIndex;
+    pub fn get(self: *const Self, input: []const u8) !?[]const u8 {
+        return self.data.get(input);
     }
 };

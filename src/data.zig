@@ -80,7 +80,7 @@ pub const Map = struct {
 
         for (&ranges, 0..) |*range, i| {
             range.prob /= @floatFromInt(result.charCount);
-            std.log.info("{c} {}", .{ @as(u8, @intCast(i)), range.prob });
+            _ = i;
         }
 
         var lowInterval: f128 = 0;
@@ -115,11 +115,12 @@ pub const Map = struct {
             word.value = ((word.low + word.high) / 2);
         }
 
-        std.mem.sort(Word, result.words.items, {}, Word.lessThan);
-
-        for (words.items) |word| {
-            std.log.info("{s} || [{}, {})", .{ word.word, word.low, word.high });
-        }
+        std.mem.sort(
+            Word,
+            result.words.items,
+            {},
+            Word.lessThan,
+        );
 
         return result;
     }
@@ -128,7 +129,7 @@ pub const Map = struct {
         self.words.deinit();
     }
 
-    pub fn get(self: *const Self, input: []const u8) ![]const u8 {
+    pub fn get(self: *const Self, input: []const u8) !?[]const u8 {
         //sanity check linear search
         // for (self.words.items) |word| {
         //     if (std.mem.eql(u8, input, word.word)) {
@@ -143,7 +144,7 @@ pub const Map = struct {
             self.words.items,
             target,
             Word.compare,
-        ) orelse return error.WordNotFound;
+        ) orelse return null;
 
         return self.words.items[index].outputWord;
     }
