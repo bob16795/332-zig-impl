@@ -1,6 +1,6 @@
 # Requirements
 
-[Zig]{https://ziglang.org/download/}
+[Zig](https://ziglang.org/download/)
 
 # Running the project 
 
